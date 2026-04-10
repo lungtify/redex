@@ -18,8 +18,8 @@ RUN wget https://dl.google.com/android/repository/commandlinetools-linux-6609375
     unzip commandlinetools-linux-6609375_latest.zip -d sdk/cmdline-tools/ && \
     rm commandlinetools-linux-6609375_latest.zip && \
     cd sdk/cmdline-tools/tools/bin && \
-    echo 'y' | ./sdkmanager --install 'build-tools;29.0.2' && \
-    ./sdkmanager --install 'platforms;android-29' && \
+    echo 'y' | ./sdkmanager --install 'build-tools;32.0.0' && \
+    ./sdkmanager --install 'platforms;android-32' && \
     cd ../../../.. && \
     rm -rf sdk/emulator 2>/dev/null
 COPY . .

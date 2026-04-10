@@ -1,23 +1,56 @@
-name: Docker Image CI
+name: Build and Upload to Release
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  workflow_dispatch:  # 允许手动触发
+    # 自动触发：当推送到符合 ‘v*’ 模式的标签时（例如 v1.0.0）
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    # 手动触发：允许在 GitHub Actions 页面手动运行，并输入参数
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0-manual'
+        type: string
 
 jobs:
-  build-only:
+  build-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Release Version
+        id: set-version
+        run: |
+          # 逻辑：如果是由推送标签触发，则版本号为标签名；如果是手动触发，则版本号为输入的参数。
+          if [ "${{ github.event_name }}" = "push" ]; then
+            RELEASE_VERSION="${{ github.ref_name }}"
+          else
+            RELEASE_VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "Using version: ${RELEASE_VERSION}"
 
       - name: Build Docker Image
         run: |
-          docker build . \
-            -f container/Dockerfile \
-            -t redex:latest \
-            -t redex:${{ github.sha }}
+          # 使用上一步确定的版本号作为镜像标签
+          docker build . -f container/Dockerfile -t redex:${{ steps.set-version.outputs.RELEASE_VERSION }}
+          # 将镜像保存为tar文件，文件名中也包含版本号
+          docker save redex:${{ steps.set-version.outputs.RELEASE_VERSION }} -o redex-${{ steps.set-version.outputs.RELEASE_VERSION }}.tar
+
+      - name: Create GitHub Release and Upload Artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          # 使用确定的版本号作为Release名称
+          name: ${{ steps.set-version.outputs.RELEASE_VERSION }}
+          tag_name: ${{ steps.set-version.outputs.RELEASE_VERSION }}  # 同时为这个手动Release创建一个Git标签
+          generate_release_notes: true
+          files: |
+            redex-${{ steps.set-version.outputs.RELEASE_VERSION }}.tar
